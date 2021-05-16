@@ -7,10 +7,13 @@ using System.Threading.Tasks;
 
 using Core_NewMVC.Models;
 using Microsoft.AspNetCore.Authorization;
-
+using Core_NewMVC.CustomSessionProvider;
+using Core_NewMVC.CustomFIlters;
 namespace Core_NewMVC.Controllers
 {
-	//[Authorize] // this will use the Authorization Middleware
+	[Authorize] // this will use the Authorization Middleware
+
+	 [LogActonFilter]
 	public class DepartmentController : Controller
 	{
 		private readonly CompanyContext context;
@@ -22,7 +25,7 @@ namespace Core_NewMVC.Controllers
 
 		// GET: DepartmentController
 		//[Authorize(Roles="Admin,Manager,Clerk")]
-		[Authorize(Policy ="ReadPolicy")]
+		//[Authorize(Policy ="ReadPolicy")]
 		public ActionResult Index()
 		{
 			var depts = context.Department.ToList();
@@ -38,7 +41,7 @@ namespace Core_NewMVC.Controllers
 
 		// GET: DepartmentController/Create
 		//[Authorize(Roles = "Admin,Manager")]
-		[Authorize(Policy = "WritePolicy")]
+	//	[Authorize(Policy = "WritePolicy")]
 		public ActionResult Create()
 		{
 			var dept = new Department();
@@ -54,6 +57,7 @@ namespace Core_NewMVC.Controllers
 			{
 				if (ModelState.IsValid)
 				{
+				
 					context.Department.Add(dept);
 					context.SaveChanges();
 					return RedirectToAction(nameof(Index));
@@ -109,6 +113,18 @@ namespace Core_NewMVC.Controllers
 			{
 				return View();
 			}
+		}
+
+
+		public IActionResult ShowEmployees(int id)
+		{
+			// HttpContext.Session.SetInt32("DeptNo",id);
+
+			var dept = context.Department.Find(id);
+
+			HttpContext.Session.SetEntity<Department>("dept",dept);
+
+			return RedirectToAction("Index", "Employee");
 		}
 	}
 }

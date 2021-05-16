@@ -1,5 +1,6 @@
 using Core_NewMVC.Data;
 using Core_NewMVC.Models;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -13,7 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
+using Core_NewMVC.CustomFIlters;
 namespace Core_NewMVC
 {
 	public class Startup
@@ -28,6 +29,29 @@ namespace Core_NewMVC
 		// This method gets called by the runtime. Use this method to add services to the container.
 		public void ConfigureServices(IServiceCollection services)
 		{
+			services.ConfigureApplicationCookie(options => {
+				options.Cookie.HttpOnly = true;
+				options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+				options.LoginPath = "/Login";
+				options.AccessDeniedPath = "/AccessDenied";
+				options.SlidingExpiration = true;
+				options.Events = new CookieAuthenticationEvents
+				{
+					OnRedirectToLogin = ctx => {
+						var requestPath = ctx.Request.Path;
+						if (requestPath.StartsWithSegments("/Account"))
+						{
+							ctx.Response.Redirect("/Account?ReturnUrl=" + requestPath + ctx.Request.QueryString);
+						}
+						else
+						{
+							ctx.Response.Redirect("/Login?ReturnUrl=" + requestPath + ctx.Request.QueryString);
+						}
+						return Task.CompletedTask;
+					}
+				};
+			});
+
 			services.AddDbContext<ApplicationDbContext>(options =>
 				options.UseSqlServer(
 					Configuration.GetConnectionString("DefaultConnection")));
@@ -58,8 +82,17 @@ namespace Core_NewMVC
 				});
 			});
 
+			// COnfguration of Session State Support for the Application
+			services.AddDistributedMemoryCache();
+			services.AddSession(session=> {
+				session.IdleTimeout = TimeSpan.FromMinutes(20);
+			});
 
-			services.AddControllersWithViews();
+
+			services.AddControllersWithViews(options=> {
+				// options.Filters.Add(new LogActonFilterAttribute());
+				options.Filters.Add(typeof(AppExceptionFilterAttribute));
+			});
 			services.AddRazorPages();
 		}
 
@@ -80,6 +113,10 @@ namespace Core_NewMVC
 			app.UseHttpsRedirection();
 			app.UseStaticFiles();
 
+			// Ask the HttpContext to use the Session Store to perform Session Read / Write Operations
+			app.UseSession();
+
+
 			app.UseRouting();
 
 			app.UseAuthentication();
@@ -91,6 +128,7 @@ namespace Core_NewMVC
 					name: "default",
 					pattern: "{controller=Home}/{action=Index}/{id?}");
 				endpoints.MapRazorPages();
+				
 			});
 		}
 	}
